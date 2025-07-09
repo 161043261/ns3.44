@@ -48,15 +48,14 @@ main(int argc, char* argv[])
 
     // n0 -> n4; n1 -> n4; n2 -> n4; n3 -> n4
     PointToPointHelper p2pHostToRouter;
-    p2pHostToRouter.SetDeviceAttribute("DataRate", StringValue("50Gbps"));
-    p2pHostToRouter.SetChannelAttribute("Delay", StringValue("100ms"));
+    p2pHostToRouter.SetDeviceAttribute("DataRate", StringValue("1Gbps"));
+    p2pHostToRouter.SetChannelAttribute("Delay", StringValue("30ms"));
 
     //! 配置队列规则
     PointToPointHelper p2pRouterToRecv;
-    p2pRouterToRecv.SetDeviceAttribute("DataRate", StringValue("5Gbps")); // 瓶颈
+    p2pRouterToRecv.SetDeviceAttribute("DataRate", StringValue("1Gbps")); // 瓶颈
     p2pRouterToRecv.SetChannelAttribute("Delay", StringValue("10ms"));
 
-    // ------------------ 连接发送端 ↔ 路由器 ------------------
     std::vector<NetDeviceContainer> devSenderToRouter(4);
     std::vector<TrafficControlHelper> tchLeft(4);
     for (uint32_t i = 0; i < 4; ++i)
@@ -103,35 +102,30 @@ main(int argc, char* argv[])
     }
     routerStatic->AddNetworkRouteTo(Ipv4Address("10.1.100.0"), Ipv4Mask("255.255.255.0"), 5);
 
-    // Receiver 默认路由
     Ptr<Ipv4StaticRouting> recvStatic = sRouting.GetStaticRouting(receiver->GetObject<Ipv4>());
     recvStatic->SetDefaultRoute(ifRouterToRecv.GetAddress(0), 1);
 
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-    // ------------------ 应用层 ------------------
-    // 1. 持续 TCP 流 (n0)
     OnOffHelper mainTcp("ns3::TcpSocketFactory",
                         InetSocketAddress(ifRouterToRecv.GetAddress(1), 9000));
-    mainTcp.SetAttribute("DataRate", StringValue("25Gbps"));
+    mainTcp.SetAttribute("DataRate", StringValue("1Gbps"));
     mainTcp.SetAttribute("PacketSize", UintegerValue(1472));
     mainTcp.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=100]"));
     mainTcp.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0]"));
     ApplicationContainer mainApp = mainTcp.Install(senders.Get(0));
 
-    // 2‑4. Burst UDP 流 (n1‑n3)
     for (uint32_t i = 1; i < 4; ++i)
     {
         OnOffHelper burst("ns3::UdpSocketFactory",
                           InetSocketAddress(ifRouterToRecv.GetAddress(1), 9000 + i));
-        burst.SetAttribute("DataRate", StringValue("50Gbps"));
+        burst.SetAttribute("DataRate", StringValue("1Gbps"));
         burst.SetAttribute("PacketSize", UintegerValue(1472));
         burst.SetAttribute("OnTime",
-                           StringValue("ns3::ConstantRandomVariable[Constant=1]")); // 每次开 1 s
+                           StringValue("ns3::ConstantRandomVariable[Constant=1]"));
         burst.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0]"));
         ApplicationContainer burstApp = burst.Install(senders.Get(i));
 
-        // 周期性启动 50‑100 s 内每 10 s 开 1 s
         for (double t = 50.0; t < 100.0; t += 10.0)
         {
             burstApp.Start(Seconds(t));
@@ -140,15 +134,13 @@ main(int argc, char* argv[])
     }
 
     ApplicationContainer sinkApp;
-        // 接收端 Sink（监听多个端口）
-        for (uint16_t port = 9000; port <= 9003; ++port)
+    for (uint16_t port = 9000; port <= 9003; ++port)
     {
         if (port == 9000)
         {
             PacketSinkHelper sinkHelper("ns3::TcpSocketFactory",
                                         InetSocketAddress(Ipv4Address::GetAny(), port));
             sinkApp = sinkHelper.Install(receiver);
-
         }
         else
         {
@@ -159,7 +151,6 @@ main(int argc, char* argv[])
     }
     Ptr<PacketSink> sink = StaticCast<PacketSink>(sinkApp.Get(0));
 
-    // Ping 追踪 RTT（从接收端向 Router）
     PingHelper ping(ifRouterToRecv.GetAddress(0));
     ping.SetAttribute("Interval", TimeValue(MilliSeconds(100)));
     ping.SetAttribute("Count", UintegerValue(10000));
@@ -170,7 +161,7 @@ main(int argc, char* argv[])
 
     std::ofstream rttLog("rtt.log");
     Ptr<Ping> pingApp = DynamicCast<Ping>(pingApps.Get(0));
-    rttLog << "Timestamp(s)\tRtt(ms)\n";
+    rttLog << "timestamp(s)\trtt(ms)\n";
     Callback<void, uint16_t, Time> rttCb([&rttLog](uint16_t seq, Time rtt) {
         rttLog << Simulator::Now().GetSeconds() << " " << rtt.GetMilliSeconds() << std::endl;
         RttCache::Instance().PushRtt(rtt); // 缓存 RTT
@@ -186,7 +177,7 @@ main(int argc, char* argv[])
 
     Simulator::Stop(Seconds(103.0));
     Simulator::Run();
-    // 输出结果
+    //! 输出结果
     monitor->CheckForLostPackets();
     Ptr<ns3::Ipv4FlowClassifier> classifier =
         DynamicCast<ns3::Ipv4FlowClassifier>(flowMonitor.GetClassifier());
