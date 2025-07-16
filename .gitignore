@@ -1,0 +1,6 @@
+.cache/
+.lock*
+*.log
+build/
+cmake-cache/
+**/.DS_Store

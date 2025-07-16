@@ -20,7 +20,7 @@
 #include "ns3/timer.h"
 #include "ns3/traced-value.h"
 
-#include <queue>
+#include <shared_mutex>
 #include <stdint.h>
 
 namespace ns3
@@ -1489,5 +1489,36 @@ typedef void (*EcnStatesTracedValueCallback)(const TcpSocketState::EcnState_t ol
                                              const TcpSocketState::EcnState_t newValue);
 
 } // namespace ns3
+
+class RttCache
+{
+  public:
+    static RttCache& Instance()
+    {
+        static RttCache instance;
+        return instance;
+    }
+
+    void PushRtt(ns3::Time rtt)
+    {
+        std::lock_guard<std::shared_mutex> lock(m_mut);
+        if (m_rttDeque.size() >= 10)
+        {
+            m_rttDeque.pop_front();
+        }
+        m_rttDeque.push_back(rtt);
+    }
+
+    std::deque<ns3::Time> GetRttDeque()
+    {
+        std::lock_guard<std::shared_mutex> lock(m_mut);
+        return m_rttDeque;
+    }
+
+  private:
+    RttCache() = default;
+    std::deque<ns3::Time> m_rttDeque;
+    std::shared_mutex m_mut;
+};
 
 #endif /* TCP_SOCKET_BASE_H */

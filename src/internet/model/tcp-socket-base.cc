@@ -875,7 +875,7 @@ TcpSocketBase::ShutdownRecv()
 }
 
 /* Inherit from Socket class: Send a packet. Parameter flags is not used.
-    Packet has no TCP header. Invoked by upper-layer application */
+ Packet has no TCP header. Invoked by upper-layer application */
 int
 TcpSocketBase::Send(Ptr<Packet> p, uint32_t flags)
 {
@@ -933,7 +933,7 @@ TcpSocketBase::SendTo(Ptr<Packet> p, uint32_t flags, const Address& /* address *
 }
 
 /* Inherit from Socket class: Return data to upper-layer application. Parameter flags
-   is not used. Data is returned as a packet of size no larger than maxSize */
+is not used. Data is returned as a packet of size no larger than maxSize */
 Ptr<Packet>
 TcpSocketBase::Recv(uint32_t maxSize, uint32_t flags)
 {
@@ -1122,7 +1122,7 @@ TcpSocketBase::DoConnect()
 }
 
 /* Do the action to close the socket. Usually send a packet with appropriate
-    flags depended on the current m_state. */
+ flags depended on the current m_state. */
 int
 TcpSocketBase::DoClose()
 {
@@ -1185,7 +1185,7 @@ TcpSocketBase::CloseAndNotify()
 }
 
 /* Tell if a sequence number range is out side the range that my rx buffer can
-    accept */
+ accept */
 bool
 TcpSocketBase::OutOfRange(SequenceNumber32 head, SequenceNumber32 tail) const
 {
@@ -1205,8 +1205,8 @@ TcpSocketBase::OutOfRange(SequenceNumber32 head, SequenceNumber32 tail) const
 }
 
 /* Function called by the L3 protocol when it received a packet to pass on to
-    the TCP. This function is registered as the "RxCallback" function in
-    SetupCallback(), which invoked by Bind(), and CompleteFork() */
+ the TCP. This function is registered as the "RxCallback" function in
+ SetupCallback(), which invoked by Bind(), and CompleteFork() */
 void
 TcpSocketBase::ForwardUp(Ptr<Packet> packet,
                          Ipv4Header header,
@@ -1523,7 +1523,7 @@ TcpSocketBase::DoForwardUp(Ptr<Packet> packet, const Address& fromAddress, const
 }
 
 /* Received a packet upon ESTABLISHED state. This function is mimicking the
-    role of tcp_rcv_established() in tcp_input.c in Linux kernel. */
+ role of tcp_rcv_established() in tcp_input.c in Linux kernel. */
 void
 TcpSocketBase::ProcessEstablished(Ptr<Packet> packet, const TcpHeader& tcpHeader)
 {
@@ -1719,9 +1719,9 @@ TcpSocketBase::EnterRecovery(uint32_t currentDelivered)
     if (!m_congestionControl->HasCongControl())
     {
         m_recoveryOps->EnterRecovery(m_tcb, m_dupAckCount, UnAckDataCount(), currentDelivered);
-        NS_LOG_INFO(m_dupAckCount << " dupack. Enter fast recovery mode."
-                                  << "Reset cwnd to " << m_tcb->m_cWnd << ", ssthresh to "
-                                  << m_tcb->m_ssThresh << " at fast recovery seqnum " << m_recover
+        NS_LOG_INFO(m_dupAckCount << " dupack. Enter fast recovery mode." << "Reset cwnd to "
+                                  << m_tcb->m_cWnd << ", ssthresh to " << m_tcb->m_ssThresh
+                                  << " at fast recovery seqnum " << m_recover
                                   << " calculated in flight: " << bytesInFlight);
     }
 
@@ -2255,9 +2255,9 @@ TcpSocketBase::ProcessAck(const SequenceNumber32& ackNumber,
 
                 m_tcb->m_cWndInfl = m_tcb->m_cWnd;
 
-                NS_LOG_LOGIC("Congestion control called: "
-                             << " cWnd: " << m_tcb->m_cWnd << " ssTh: " << m_tcb->m_ssThresh
-                             << " segsAcked: " << segsAcked);
+                NS_LOG_LOGIC("Congestion control called: " << " cWnd: " << m_tcb->m_cWnd
+                                                           << " ssTh: " << m_tcb->m_ssThresh
+                                                           << " segsAcked: " << segsAcked);
 
                 NewAck(ackNumber, true);
             }
@@ -2743,7 +2743,7 @@ TcpSocketBase::DoPeerClose()
 }
 
 /* Kill this socket. This is a callback function configured to m_endpoint in
-   SetupCallback(), invoked when the endpoint is destroyed. */
+SetupCallback(), invoked when the endpoint is destroyed. */
 void
 TcpSocketBase::Destroy()
 {
@@ -2759,7 +2759,7 @@ TcpSocketBase::Destroy()
 }
 
 /* Kill this socket. This is a callback function configured to m_endpoint in
-   SetupCallback(), invoked when the endpoint is destroyed. */
+SetupCallback(), invoked when the endpoint is destroyed. */
 void
 TcpSocketBase::Destroy6()
 {
@@ -3028,8 +3028,8 @@ TcpSocketBase::SetupEndpoint6()
 }
 
 /* This function is called only if a SYN received in LISTEN state. After
-   TcpSocketBase cloned, allocate a new end point to handle the incoming
-   connection and send a SYN+ACK to complete the handshake. */
+TcpSocketBase cloned, allocate a new end point to handle the incoming
+connection and send a SYN+ACK to complete the handshake. */
 void
 TcpSocketBase::CompleteFork(Ptr<Packet> p [[maybe_unused]],
                             const TcpHeader& h,
@@ -3107,6 +3107,34 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
      * if both options are set. Once the packet got to layer three, only
      * the corresponding tags will be read.
      */
+
+    auto rttDeque = RttCache::Instance().GetRttDeque();
+    if (rttDeque.size() > 1)
+    {
+        double alpha = 1.0 / 16.0;
+        double ewmaRttJitter = 0.0;
+        double last = rttDeque.front().GetMilliSeconds();
+        for (size_t i = 1; i < rttDeque.size(); ++i)
+        {
+            double diff = std::abs(rttDeque[i].GetMilliSeconds() - last);
+            ewmaRttJitter = alpha * diff + (1 - alpha) * ewmaRttJitter;
+            last = rttDeque[i].GetMilliSeconds();
+        }
+        // NS_LOG_WARN("[tcp-socket-base] EWMA RTT Jitter: " << ewmaRttJitter << " ms");
+        if (ewmaRttJitter != 0)
+        {
+            // NS_LOG_WARN("[tcp-socket-base] EWMA RTT Jitter: " << ewmaRttJitter << " ms");
+            if (ewmaRttJitter >= 0.7)
+            {
+                m_tcb->m_ectCodePoint = ns3::TcpSocketState::EcnCodePoint_t::Ect1;
+            }
+            if (ewmaRttJitter <= 0.3)
+            {
+                m_tcb->m_ectCodePoint = ns3::TcpSocketState::EcnCodePoint_t::Ect0;
+            }
+        }
+    }
+
     if (GetIpTos())
     {
         SocketIpTosTag ipTosTag;
@@ -3182,7 +3210,7 @@ TcpSocketBase::AddSocketTags(const Ptr<Packet>& p, bool isEct) const
 }
 
 /* Extract at most maxSize bytes from the TxBuffer at sequence seq, add the
-    TCP header, and send to TcpL4Protocol */
+ TCP header, and send to TcpL4Protocol */
 uint32_t
 TcpSocketBase::SendDataPacket(SequenceNumber32 seq, uint32_t maxSize, bool withAck)
 {
