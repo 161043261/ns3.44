@@ -56,7 +56,7 @@ main(int argc, char* argv[])
 
     //! 1Gbps left bandwidth
     p2pLeftHelper.SetDeviceAttribute("DataRate", StringValue("1Gbps"));
-    p2pLeftHelper.SetChannelAttribute("Delay", StringValue("30ms"));
+    p2pLeftHelper.SetChannelAttribute("Delay", StringValue("100ms"));
 
     PointToPointHelper p2pRightHelper;
 
