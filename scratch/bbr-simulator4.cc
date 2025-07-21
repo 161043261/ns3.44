@@ -52,22 +52,22 @@ main(int argc, char* argv[])
     stack.Install(receiver);
 
     // n0 -> n4; n1 -> n4; n2 -> n4; n3 -> n4
-    PointToPointHelper p2pLeftHelper;
+    PointToPointHelper p2pLeft;
 
     //! 1Gbps left bandwidth
-    p2pLeftHelper.SetDeviceAttribute("DataRate", StringValue("1Gbps"));
-    p2pLeftHelper.SetChannelAttribute("Delay", StringValue("100ms"));
+    p2pLeft.SetDeviceAttribute("DataRate", StringValue("30Gbps"));
+    p2pLeft.SetChannelAttribute("Delay", StringValue("100ms"));
 
-    PointToPointHelper p2pRightHelper;
+    PointToPointHelper p2pRight;
 
     //! 100Mbps right bandwidth (bottleneck)
-    p2pRightHelper.SetDeviceAttribute("DataRate", StringValue("100Mbps")); // 瓶颈
-    p2pRightHelper.SetChannelAttribute("Delay", StringValue("10ms"));
+    p2pRight.SetDeviceAttribute("DataRate", StringValue("100Mbps")); // 瓶颈
+    p2pRight.SetChannelAttribute("Delay", StringValue("10ms"));
 
     std::vector<NetDeviceContainer> ndcLeft(4);
     for (uint32_t i = 0; i < 4; ++i)
     {
-        ndcLeft[i] = p2pLeftHelper.Install(senders.Get(i), router);
+        ndcLeft[i] = p2pLeft.Install(senders.Get(i), router);
 
         //! 创建随机丢包模型
         Ptr<RateErrorModel> rem = CreateObject<RateErrorModel>();
@@ -77,7 +77,7 @@ main(int argc, char* argv[])
         ndcLeft[i].Get(1)->SetAttribute("ReceiveErrorModel", PointerValue(rem));
     }
 
-    NetDeviceContainer ndcRight = p2pRightHelper.Install(router, receiver);
+    NetDeviceContainer ndcRight = p2pRight.Install(router, receiver);
 
     TrafficControlHelper tchLeft;
     // tchLeft.SetRootQueueDisc("ns3::RedQueueDisc");
@@ -169,8 +169,8 @@ main(int argc, char* argv[])
     mainApp.Stop(Seconds(101.0));
 
     //! 安装流量监控
-    FlowMonitorHelper flowMonitor;
-    Ptr<FlowMonitor> monitor = flowMonitor.InstallAll();
+    FlowMonitorHelper flowMon;
+    Ptr<FlowMonitor> monitor = flowMon.InstallAll();
 
     Simulator::Stop(Seconds(103.0));
 
@@ -197,7 +197,7 @@ main(int argc, char* argv[])
     //! 输出结果
     monitor->CheckForLostPackets();
     Ptr<ns3::Ipv4FlowClassifier> classifier =
-        DynamicCast<ns3::Ipv4FlowClassifier>(flowMonitor.GetClassifier());
+        DynamicCast<ns3::Ipv4FlowClassifier>(flowMon.GetClassifier());
 
     std::map<FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats();
 
